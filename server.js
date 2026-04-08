@@ -85,10 +85,14 @@ app.post('/api/contact', async (req, res) => {
     };
 
     // Send both emails
-    await Promise.all([
+    console.log('Sending emails...');
+    const [ownerResult, userResult] = await Promise.all([
       transporter.sendMail(ownerMailOptions),
       transporter.sendMail(userMailOptions)
     ]);
+    
+    console.log('Owner email sent:', ownerResult.messageId);
+    console.log('User email sent:', userResult.messageId);
 
     res.json({ success: true });
     

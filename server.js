@@ -112,7 +112,24 @@ app.post('/api/contact', async (req, res) => {
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString(), message: 'Portfolio Contact API is running' });
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    message: 'Portfolio Contact API is running'
+  });
+});
+
+// Debug endpoint to check environment variables
+app.get('/api/debug', (req, res) => {
+  res.json({ 
+    environment: {
+      GMAIL_USER: process.env.GMAIL_USER ? 'SET' : 'NOT SET',
+      GMAIL_PASS: process.env.GMAIL_PASS ? 'SET' : 'NOT SET',
+      OWNER_EMAIL: process.env.OWNER_EMAIL ? 'SET' : 'NOT SET',
+      PORT: process.env.PORT || '3000'
+    },
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Root endpoint

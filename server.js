@@ -45,15 +45,39 @@ Rochak Raj Sharma
 // Contact form endpoint
 app.post('/api/contact', async (req, res) => {
   try {
+    console.log('Request received:', req.body);
     const { from_name, from_email, subject, message } = req.body;
 
+    // Validate required fields
     if (!from_name || !from_email || !subject || !message) {
-      return res.status(400).json({ success: false, error: 'All fields are required: from_name, from_email, subject, message' });
+      console.log('Validation error: missing fields');
+      return res.status(400).json({
+        success: false,
+        error: 'All fields are required: from_name, from_email, subject, message'
+      });
     }
 
+    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(from_email)) {
-      return res.status(400).json({ success: false, error: 'Invalid email format' });
+      console.log('Validation error: invalid email format');
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid email format'
+      });
+    }
+
+    // Check environment variables
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS || !process.env.OWNER_EMAIL) {
+      console.log('Environment variables missing:', {
+        GMAIL_USER: !!process.env.GMAIL_USER,
+        GMAIL_PASS: !!process.env.GMAIL_PASS,
+        OWNER_EMAIL: !!process.env.OWNER_EMAIL
+      });
+      return res.status(500).json({
+        success: false,
+        error: 'Server configuration error: missing environment variables'
+      });
     }
 
     const ownerMailOptions = {

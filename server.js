@@ -8,8 +8,8 @@ import fetch from 'node-fetch';
 try {
   dotenv.config();
   console.log('Environment variables loaded successfully');
-  console.log('GMAIL_USER:', process.env.GMAIL_USER ? 'SET' : 'NOT SET');
-  console.log('GMAIL_PASS:', process.env.GMAIL_PASS ? 'SET' : 'NOT SET');
+  console.log('ELASTIC_EMAIL_USER:', process.env.ELASTIC_EMAIL_USER ? 'SET' : 'NOT SET');
+  console.log('ELASTIC_EMAIL_PASSWORD:', process.env.ELASTIC_EMAIL_PASSWORD ? 'SET' : 'NOT SET');
   console.log('OWNER_EMAIL:', process.env.OWNER_EMAIL ? 'SET' : 'NOT SET');
 } catch (error) {
   console.error('Error loading environment variables:', error);
@@ -23,14 +23,14 @@ app.use(cors({ origin: '*' })); // ✅ Allow all domains
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
-// Create Gmail transporter with optimized settings
+// Create ElasticEmail transporter for reliable cloud deployment
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
+  host: 'smtp.elasticemail.com',
+  port: 2525,
   secure: false, // Use TLS
   auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS,
+    user: process.env.ELASTIC_EMAIL_USER,
+    pass: process.env.ELASTIC_EMAIL_PASSWORD,
   },
   pool: true, // Use connection pooling
   maxConnections: 1,
@@ -86,10 +86,10 @@ app.post('/api/contact', async (req, res) => {
     }
 
     // Check environment variables
-    if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS || !process.env.OWNER_EMAIL) {
+    if (!process.env.ELASTIC_EMAIL_USER || !process.env.ELASTIC_EMAIL_PASSWORD || !process.env.OWNER_EMAIL) {
       console.log('Environment variables missing:', {
-        GMAIL_USER: !!process.env.GMAIL_USER,
-        GMAIL_PASS: !!process.env.GMAIL_PASS,
+        ELASTIC_EMAIL_USER: !!process.env.ELASTIC_EMAIL_USER,
+        ELASTIC_EMAIL_PASSWORD: !!process.env.ELASTIC_EMAIL_PASSWORD,
         OWNER_EMAIL: !!process.env.OWNER_EMAIL
       });
       return res.status(500).json({
@@ -99,14 +99,14 @@ app.post('/api/contact', async (req, res) => {
     }
 
     const ownerMailOptions = {
-      from: process.env.GMAIL_USER,
+      from: process.env.ELASTIC_EMAIL_USER,
       to: process.env.OWNER_EMAIL,
       subject: `New Contact Form Message: ${subject}`,
       text: getOwnerEmailTemplate({ from_name, from_email, subject, message }),
     };
 
     const userMailOptions = {
-      from: process.env.GMAIL_USER,
+      from: process.env.ELASTIC_EMAIL_USER,
       to: from_email,
       subject: 'Thank you for contacting me',
       text: getUserEmailTemplate({ from_name, subject }),
@@ -158,8 +158,8 @@ app.get('/api/health', (req, res) => {
 app.get('/api/debug', (req, res) => {
   res.json({ 
     environment: {
-      GMAIL_USER: process.env.GMAIL_USER ? 'SET' : 'NOT SET',
-      GMAIL_PASS: process.env.GMAIL_PASS ? 'SET' : 'NOT SET',
+      ELASTIC_EMAIL_USER: process.env.ELASTIC_EMAIL_USER ? 'SET' : 'NOT SET',
+      ELASTIC_EMAIL_PASSWORD: process.env.ELASTIC_EMAIL_PASSWORD ? 'SET' : 'NOT SET',
       OWNER_EMAIL: process.env.OWNER_EMAIL ? 'SET' : 'NOT SET',
       PORT: process.env.PORT || '3000'
     },

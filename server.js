@@ -104,7 +104,7 @@ app.post('/api/contact', async (req, res) => {
     // Prepare Brevo API email data
     const ownerEmailData = {
       sender: {
-        email: process.env.OWNER_EMAIL,
+        email: 'noreply@brevo.com',
         name: 'Portfolio Contact Form'
       },
       to: [{ email: process.env.OWNER_EMAIL }],
@@ -114,7 +114,7 @@ app.post('/api/contact', async (req, res) => {
 
     const userEmailData = {
       sender: {
-        email: process.env.OWNER_EMAIL,
+        email: 'noreply@brevo.com',
         name: 'Portfolio Contact Form'
       },
       to: [{ email: from_email }],

@@ -7,8 +7,7 @@ import dotenv from 'dotenv';
 try {
   dotenv.config();
   console.log('Environment variables loaded successfully');
-  console.log('BREVO_USER:', process.env.BREVO_USER ? 'SET' : 'NOT SET');
-  console.log('BREVO_PASSWORD:', process.env.BREVO_PASSWORD ? 'SET' : 'NOT SET');
+  console.log('BREVO_API_KEY:', process.env.BREVO_API_KEY ? 'SET' : 'NOT SET');
   console.log('OWNER_EMAIL:', process.env.OWNER_EMAIL ? 'SET' : 'NOT SET');
 } catch (error) {
   console.error('Error loading environment variables:', error);
@@ -22,23 +21,28 @@ app.use(cors({ origin: '*' })); // ✅ Allow all domains
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
-// Create Brevo transporter for reliable cloud deployment
-const transporter = nodemailer.createTransport({
-  host: 'smtp-relay.brevo.com',
-  port: 587,
-  secure: false, // Use TLS
-  auth: {
-    user: process.env.BREVO_USER,
-    pass: process.env.BREVO_PASSWORD,
-  },
-  pool: true, // Use connection pooling
-  maxConnections: 1,
-  rateDelta: 15000,
-  rateLimit: 5,
-  connectionTimeout: 60000,
-  greetingTimeout: 30000,
-  socketTimeout: 60000,
-});
+// Brevo API configuration
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
+
+// Function to send email using Brevo API
+const sendBrevoEmail = async (emailData) => {
+  const response = await fetch(BREVO_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api-key': BREVO_API_KEY,
+    },
+    body: JSON.stringify(emailData),
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`Brevo API error: ${errorData.message || response.statusText}`);
+  }
+  
+  return response.json();
+};
 
 // Email templates
 const getOwnerEmailTemplate = ({ from_name, from_email, subject, message }) => `
@@ -85,10 +89,9 @@ app.post('/api/contact', async (req, res) => {
     }
 
     // Check environment variables
-    if (!process.env.BREVO_USER || !process.env.BREVO_PASSWORD || !process.env.OWNER_EMAIL) {
+    if (!process.env.BREVO_API_KEY || !process.env.OWNER_EMAIL) {
       console.log('Environment variables missing:', {
-        BREVO_USER: !!process.env.BREVO_USER,
-        BREVO_PASSWORD: !!process.env.BREVO_PASSWORD,
+        BREVO_API_KEY: !!process.env.BREVO_API_KEY,
         OWNER_EMAIL: !!process.env.OWNER_EMAIL
       });
       return res.status(500).json({
@@ -97,26 +100,33 @@ app.post('/api/contact', async (req, res) => {
       });
     }
 
-    const ownerMailOptions = {
-      from: process.env.BREVO_USER,
-      to: process.env.OWNER_EMAIL,
+    // Prepare Brevo API email data
+    const ownerEmailData = {
+      sender: {
+        email: process.env.OWNER_EMAIL,
+        name: 'Portfolio Contact Form'
+      },
+      to: [{ email: process.env.OWNER_EMAIL }],
       subject: `New Contact Form Message: ${subject}`,
-      text: getOwnerEmailTemplate({ from_name, from_email, subject, message }),
+      textContent: getOwnerEmailTemplate({ from_name, from_email, subject, message }),
     };
 
-    const userMailOptions = {
-      from: process.env.BREVO_USER,
-      to: from_email,
+    const userEmailData = {
+      sender: {
+        email: process.env.OWNER_EMAIL,
+        name: 'Portfolio Contact Form'
+      },
+      to: [{ email: from_email }],
       subject: 'Thank you for contacting me',
-      text: getUserEmailTemplate({ from_name, subject }),
+      textContent: getUserEmailTemplate({ from_name, subject }),
     };
 
-    // Send both emails using Gmail
+    // Send both emails using Brevo API
     console.log('Sending emails...');
     try {
       const [ownerResult, userResult] = await Promise.all([
-        transporter.sendMail(ownerMailOptions),
-        transporter.sendMail(userMailOptions)
+        sendBrevoEmail(ownerEmailData),
+        sendBrevoEmail(userEmailData)
       ]);
       
       console.log('Owner email sent:', ownerResult.messageId);
@@ -157,8 +167,7 @@ app.get('/api/health', (req, res) => {
 app.get('/api/debug', (req, res) => {
   res.json({ 
     environment: {
-      BREVO_USER: process.env.BREVO_USER ? 'SET' : 'NOT SET',
-      BREVO_PASSWORD: process.env.BREVO_PASSWORD ? 'SET' : 'NOT SET',
+      BREVO_API_KEY: process.env.BREVO_API_KEY ? 'SET' : 'NOT SET',
       OWNER_EMAIL: process.env.OWNER_EMAIL ? 'SET' : 'NOT SET',
       PORT: process.env.PORT || '3000'
     },

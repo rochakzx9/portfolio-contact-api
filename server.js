@@ -2,13 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
-import sgMail from '@sendgrid/mail';
 
 // Load environment variables with error handling
 try {
   dotenv.config();
   console.log('Environment variables loaded successfully');
-  console.log('SENDGRID_API_KEY:', process.env.SENDGRID_API_KEY ? 'SET' : 'NOT SET');
+  console.log('GMAIL_USER:', process.env.GMAIL_USER ? 'SET' : 'NOT SET');
+  console.log('GMAIL_PASS:', process.env.GMAIL_PASS ? 'SET' : 'NOT SET');
   console.log('OWNER_EMAIL:', process.env.OWNER_EMAIL ? 'SET' : 'NOT SET');
 } catch (error) {
   console.error('Error loading environment variables:', error);
@@ -22,18 +22,22 @@ app.use(cors({ origin: '*' })); // ✅ Allow all domains
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
-// Initialize SendGrid
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
-// Create SendGrid transporter using nodemailer
+// Create Gmail transporter with optimized settings for Render
 const transporter = nodemailer.createTransport({
-  host: 'smtp.sendgrid.net',
-  port: 587,
-  secure: false,
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // Use SSL
   auth: {
-    user: 'apikey',
-    pass: process.env.SENDGRID_API_KEY,
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_PASS,
   },
+  pool: true, // Use connection pooling
+  maxConnections: 1,
+  rateDelta: 15000,
+  rateLimit: 5,
+  connectionTimeout: 60000,
+  greetingTimeout: 30000,
+  socketTimeout: 60000,
 });
 
 // Email templates
@@ -94,29 +98,29 @@ app.post('/api/contact', async (req, res) => {
     }
 
     const ownerMailOptions = {
+      from: process.env.GMAIL_USER,
       to: process.env.OWNER_EMAIL,
       subject: `New Contact Form Message: ${subject}`,
       text: getOwnerEmailTemplate({ from_name, from_email, subject, message }),
-      from: process.env.OWNER_EMAIL
     };
 
     const userMailOptions = {
+      from: process.env.GMAIL_USER,
       to: from_email,
       subject: 'Thank you for contacting me',
       text: getUserEmailTemplate({ from_name, subject }),
-      from: process.env.OWNER_EMAIL
     };
 
-    // Send both emails using SendGrid
+    // Send both emails using Gmail
     console.log('Sending emails...');
     try {
       const [ownerResult, userResult] = await Promise.all([
-        sgMail.send(ownerMailOptions),
-        sgMail.send(userMailOptions)
+        transporter.sendMail(ownerMailOptions),
+        transporter.sendMail(userMailOptions)
       ]);
       
-      console.log('Owner email sent:', ownerResult[0].statusCode);
-      console.log('User email sent:', userResult[0].statusCode);
+      console.log('Owner email sent:', ownerResult.messageId);
+      console.log('User email sent:', userResult.messageId);
 
       res.json({ success: true });
     } catch (error) {
@@ -153,7 +157,8 @@ app.get('/api/health', (req, res) => {
 app.get('/api/debug', (req, res) => {
   res.json({ 
     environment: {
-      SENDGRID_API_KEY: process.env.SENDGRID_API_KEY ? 'SET' : 'NOT SET',
+      GMAIL_USER: process.env.GMAIL_USER ? 'SET' : 'NOT SET',
+      GMAIL_PASS: process.env.GMAIL_PASS ? 'SET' : 'NOT SET',
       OWNER_EMAIL: process.env.OWNER_EMAIL ? 'SET' : 'NOT SET',
       PORT: process.env.PORT || '3000'
     },

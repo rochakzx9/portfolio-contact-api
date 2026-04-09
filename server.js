@@ -22,13 +22,20 @@ app.use(cors({ origin: '*' })); // ✅ Allow all domains
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
-// Create Gmail transporter using App Password
+// Create Gmail transporter using App Password with timeout settings
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_PASS,
   },
+  connectionTimeout: 60000, // 60 seconds
+  greetingTimeout: 30000,   // 30 seconds
+  socketTimeout: 60000,    // 60 seconds
+  pool: true, // Use connection pooling
+  maxConnections: 5,
+  rateDelta: 1000,
+  rateLimit: 5
 });
 
 // Email templates
@@ -114,16 +121,45 @@ app.post('/api/contact', async (req, res) => {
       });
     }
 
+    // Retry function for sending emails
+    const sendEmailWithRetry = async (mailOptions, maxRetries = 3) => {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`Attempt ${attempt} to send email...`);
+          const result = await transporter.sendMail(mailOptions);
+          console.log(`Email sent successfully on attempt ${attempt}:`, result.messageId);
+          return result;
+        } catch (error) {
+          console.error(`Attempt ${attempt} failed:`, error.message);
+          
+          if (attempt === maxRetries) {
+            throw error;
+          }
+          
+          // Wait before retry (exponential backoff)
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          console.log(`Waiting ${delay}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    };
+
+    // Send both emails with retry logic
     console.log('Sending emails...');
-    const [ownerResult, userResult] = await Promise.all([
-      transporter.sendMail(ownerMailOptions),
-      transporter.sendMail(userMailOptions),
-    ]);
+    try {
+      const [ownerResult, userResult] = await Promise.all([
+        sendEmailWithRetry(ownerMailOptions),
+        sendEmailWithRetry(userMailOptions)
+      ]);
+      
+      console.log('Owner email sent:', ownerResult.messageId);
+      console.log('User email sent:', userResult.messageId);
 
-    console.log('Owner email sent:', ownerResult.messageId);
-    console.log('User email sent:', userResult.messageId);
-
-    res.json({ success: true });
+      res.json({ success: true });
+    } catch (emailError) {
+      console.error('All email attempts failed:', emailError);
+      throw emailError;
+    }
   } catch (error) {
     console.error('Error sending emails:', error);
     console.error('Error details:', {

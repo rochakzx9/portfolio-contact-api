@@ -3,8 +3,16 @@ import cors from 'cors';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 
-// Load environment variables
-dotenv.config();
+// Load environment variables with error handling
+try {
+  dotenv.config();
+  console.log('Environment variables loaded successfully');
+  console.log('GMAIL_USER:', process.env.GMAIL_USER ? 'SET' : 'NOT SET');
+  console.log('GMAIL_PASS:', process.env.GMAIL_PASS ? 'SET' : 'NOT SET');
+  console.log('OWNER_EMAIL:', process.env.OWNER_EMAIL ? 'SET' : 'NOT SET');
+} catch (error) {
+  console.error('Error loading environment variables:', error);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;

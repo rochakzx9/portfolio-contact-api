@@ -102,6 +102,18 @@ app.post('/api/contact', async (req, res) => {
       text: getUserEmailTemplate({ from_name, subject }),
     };
 
+    console.log('Testing Gmail transporter connection...');
+    try {
+      await transporter.verify();
+      console.log('Gmail transporter connection successful');
+    } catch (verifyError) {
+      console.error('Gmail transporter connection failed:', verifyError);
+      return res.status(500).json({
+        success: false,
+        error: 'Email service configuration error'
+      });
+    }
+
     console.log('Sending emails...');
     const [ownerResult, userResult] = await Promise.all([
       transporter.sendMail(ownerMailOptions),
@@ -114,7 +126,16 @@ app.post('/api/contact', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Error sending emails:', error);
-    res.status(500).json({ success: false, error: 'Failed to send emails. Please try again later.' });
+    console.error('Error details:', {
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      message: error.message
+    });
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to send emails. Please try again later.'
+    });
   }
 });
 

@@ -43,7 +43,7 @@ const transporter = nodemailer.createTransport({
 
 // Email templates
 const getOwnerEmailTemplate = ({ from_name, from_email, subject, message }) => `
-A message by ${from_name} has been received from your website (Portfolio). Kindly respond at your earliest convenience.
+A message by ${from_name} has been received from your website (Website Name). Kindly respond at your earliest convenience.
 
 Name: ${from_name}
 Email: ${from_email}
@@ -57,7 +57,7 @@ Hi ${from_name},
 Thank you for reaching out to me. I have received your request: "${subject}", and I will review it as soon as possible.
 
 Best regards,
-Rochak Raj Sharma
+(Your Name)
 `.trim();
 
 // Contact form endpoint

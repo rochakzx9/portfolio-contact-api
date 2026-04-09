@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import fetch from 'node-fetch';
 
 // Load environment variables with error handling
 try {

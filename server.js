@@ -2,13 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import sgMail from '@sendgrid/mail';
 
 // Load environment variables with error handling
 try {
   dotenv.config();
   console.log('Environment variables loaded successfully');
-  console.log('GMAIL_USER:', process.env.GMAIL_USER ? 'SET' : 'NOT SET');
-  console.log('GMAIL_PASS:', process.env.GMAIL_PASS ? 'SET' : 'NOT SET');
+  console.log('SENDGRID_API_KEY:', process.env.SENDGRID_API_KEY ? 'SET' : 'NOT SET');
   console.log('OWNER_EMAIL:', process.env.OWNER_EMAIL ? 'SET' : 'NOT SET');
 } catch (error) {
   console.error('Error loading environment variables:', error);
@@ -22,20 +22,18 @@ app.use(cors({ origin: '*' })); // ✅ Allow all domains
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
-// Create Gmail transporter using App Password with timeout settings
+// Initialize SendGrid
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+// Create SendGrid transporter using nodemailer
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.sendgrid.net',
+  port: 587,
+  secure: false,
   auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS,
+    user: 'apikey',
+    pass: process.env.SENDGRID_API_KEY,
   },
-  connectionTimeout: 60000, // 60 seconds
-  greetingTimeout: 30000,   // 30 seconds
-  socketTimeout: 60000,    // 60 seconds
-  pool: true, // Use connection pooling
-  maxConnections: 5,
-  rateDelta: 1000,
-  rateLimit: 5
 });
 
 // Email templates
@@ -96,75 +94,42 @@ app.post('/api/contact', async (req, res) => {
     }
 
     const ownerMailOptions = {
-      from: process.env.GMAIL_USER,
       to: process.env.OWNER_EMAIL,
       subject: `New Contact Form Message: ${subject}`,
       text: getOwnerEmailTemplate({ from_name, from_email, subject, message }),
+      from: process.env.OWNER_EMAIL
     };
 
     const userMailOptions = {
-      from: process.env.GMAIL_USER,
       to: from_email,
       subject: 'Thank you for contacting me',
       text: getUserEmailTemplate({ from_name, subject }),
+      from: process.env.OWNER_EMAIL
     };
 
-    console.log('Testing Gmail transporter connection...');
-    try {
-      await transporter.verify();
-      console.log('Gmail transporter connection successful');
-    } catch (verifyError) {
-      console.error('Gmail transporter connection failed:', verifyError);
-      return res.status(500).json({
-        success: false,
-        error: 'Email service configuration error'
-      });
-    }
-
-    // Retry function for sending emails
-    const sendEmailWithRetry = async (mailOptions, maxRetries = 3) => {
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          console.log(`Attempt ${attempt} to send email...`);
-          const result = await transporter.sendMail(mailOptions);
-          console.log(`Email sent successfully on attempt ${attempt}:`, result.messageId);
-          return result;
-        } catch (error) {
-          console.error(`Attempt ${attempt} failed:`, error.message);
-          
-          if (attempt === maxRetries) {
-            throw error;
-          }
-          
-          // Wait before retry (exponential backoff)
-          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-          console.log(`Waiting ${delay}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-    };
-
-    // Send both emails with retry logic
+    // Send both emails using SendGrid
     console.log('Sending emails...');
     try {
       const [ownerResult, userResult] = await Promise.all([
-        sendEmailWithRetry(ownerMailOptions),
-        sendEmailWithRetry(userMailOptions)
+        sgMail.send(ownerMailOptions),
+        sgMail.send(userMailOptions)
       ]);
       
-      console.log('Owner email sent:', ownerResult.messageId);
-      console.log('User email sent:', userResult.messageId);
+      console.log('Owner email sent:', ownerResult[0].statusCode);
+      console.log('User email sent:', userResult[0].statusCode);
 
       res.json({ success: true });
-    } catch (emailError) {
-      console.error('All email attempts failed:', emailError);
-      throw emailError;
+    } catch (error) {
+      console.error('Error sending emails:', error);
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to send emails. Please try again later.'
+      });
     }
   } catch (error) {
     console.error('Error sending emails:', error);
     console.error('Error details:', {
       code: error.code,
-      command: error.command,
       response: error.response,
       message: error.message
     });
@@ -188,8 +153,7 @@ app.get('/api/health', (req, res) => {
 app.get('/api/debug', (req, res) => {
   res.json({ 
     environment: {
-      GMAIL_USER: process.env.GMAIL_USER ? 'SET' : 'NOT SET',
-      GMAIL_PASS: process.env.GMAIL_PASS ? 'SET' : 'NOT SET',
+      SENDGRID_API_KEY: process.env.SENDGRID_API_KEY ? 'SET' : 'NOT SET',
       OWNER_EMAIL: process.env.OWNER_EMAIL ? 'SET' : 'NOT SET',
       PORT: process.env.PORT || '3000'
     },

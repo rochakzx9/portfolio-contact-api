@@ -7,8 +7,8 @@ import dotenv from 'dotenv';
 try {
   dotenv.config();
   console.log('Environment variables loaded successfully');
-  console.log('SMTP2GO_USER:', process.env.SMTP2GO_USER ? 'SET' : 'NOT SET');
-  console.log('SMTP2GO_PASSWORD:', process.env.SMTP2GO_PASSWORD ? 'SET' : 'NOT SET');
+  console.log('BREVO_USER:', process.env.BREVO_USER ? 'SET' : 'NOT SET');
+  console.log('BREVO_PASSWORD:', process.env.BREVO_PASSWORD ? 'SET' : 'NOT SET');
   console.log('OWNER_EMAIL:', process.env.OWNER_EMAIL ? 'SET' : 'NOT SET');
 } catch (error) {
   console.error('Error loading environment variables:', error);
@@ -22,14 +22,14 @@ app.use(cors({ origin: '*' })); // ✅ Allow all domains
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
-// Create SMTP2GO transporter for reliable cloud deployment
+// Create Brevo transporter for reliable cloud deployment
 const transporter = nodemailer.createTransport({
-  host: 'smtp2go.com',
-  port: 465,
-  secure: true, // Use SSL
+  host: 'smtp-relay.brevo.com',
+  port: 587,
+  secure: false, // Use TLS
   auth: {
-    user: process.env.SMTP2GO_USER,
-    pass: process.env.SMTP2GO_PASSWORD,
+    user: process.env.BREVO_USER,
+    pass: process.env.BREVO_PASSWORD,
   },
   pool: true, // Use connection pooling
   maxConnections: 1,
@@ -85,10 +85,10 @@ app.post('/api/contact', async (req, res) => {
     }
 
     // Check environment variables
-    if (!process.env.SMTP2GO_USER || !process.env.SMTP2GO_PASSWORD || !process.env.OWNER_EMAIL) {
+    if (!process.env.BREVO_USER || !process.env.BREVO_PASSWORD || !process.env.OWNER_EMAIL) {
       console.log('Environment variables missing:', {
-        SMTP2GO_USER: !!process.env.SMTP2GO_USER,
-        SMTP2GO_PASSWORD: !!process.env.SMTP2GO_PASSWORD,
+        BREVO_USER: !!process.env.BREVO_USER,
+        BREVO_PASSWORD: !!process.env.BREVO_PASSWORD,
         OWNER_EMAIL: !!process.env.OWNER_EMAIL
       });
       return res.status(500).json({
@@ -98,14 +98,14 @@ app.post('/api/contact', async (req, res) => {
     }
 
     const ownerMailOptions = {
-      from: process.env.SMTP2GO_USER,
+      from: process.env.BREVO_USER,
       to: process.env.OWNER_EMAIL,
       subject: `New Contact Form Message: ${subject}`,
       text: getOwnerEmailTemplate({ from_name, from_email, subject, message }),
     };
 
     const userMailOptions = {
-      from: process.env.SMTP2GO_USER,
+      from: process.env.BREVO_USER,
       to: from_email,
       subject: 'Thank you for contacting me',
       text: getUserEmailTemplate({ from_name, subject }),
@@ -157,8 +157,8 @@ app.get('/api/health', (req, res) => {
 app.get('/api/debug', (req, res) => {
   res.json({ 
     environment: {
-      SMTP2GO_USER: process.env.SMTP2GO_USER ? 'SET' : 'NOT SET',
-      SMTP2GO_PASSWORD: process.env.SMTP2GO_PASSWORD ? 'SET' : 'NOT SET',
+      BREVO_USER: process.env.BREVO_USER ? 'SET' : 'NOT SET',
+      BREVO_PASSWORD: process.env.BREVO_PASSWORD ? 'SET' : 'NOT SET',
       OWNER_EMAIL: process.env.OWNER_EMAIL ? 'SET' : 'NOT SET',
       PORT: process.env.PORT || '3000'
     },
